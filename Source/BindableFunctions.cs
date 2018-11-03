@@ -238,6 +238,114 @@ namespace DebugMod
             }
         }
 
+        [BindableMethod(name = "Take Screenshot", category = "Visual")]
+        public static void TakeScreenshot()
+        {
+            try
+            {
+                var dirName = Application.persistentDataPath + System.IO.Path.DirectorySeparatorChar + "screenshots";
+                System.IO.Directory.CreateDirectory(dirName);
+                var imageFilename = dirName + System.IO.Path.DirectorySeparatorChar + $"screenshot{DateTime.Now.ToFileTimeUtc()}.png";
+
+                ScreenCapture.CaptureScreenshot(imageFilename);
+            }
+            catch (Exception e)
+            {
+                Console.AddLine("Error while attempting to take screenshot, check ModLog.txt");
+                DebugMod.instance.Log("Error while attempting to take screenshot:\n" + e);
+            }
+        }
+
+        private static float fgThreshold = -3f;
+
+        [BindableMethod(name = "Toggle Foreground Elements", category = "Visual")]
+        public static void ToggleForegroundElements()
+        {
+            DebugMod.showingFgObjs = !DebugMod.showingFgObjs;
+            Console.AddLine($"{(DebugMod.showingFgObjs ? "Showing" : "Hiding")} objects beyond z = {fgThreshold}");
+
+            AdjustVisibilityOfAllElements();
+        }
+
+        [BindableMethod(name = "Show More Foreground Elements", category = "Visual")]
+        public static void ShowMoreForegroundElements()
+        {
+            fgThreshold -= 0.5f;
+
+            Console.AddLine("Foreground visibility threshold at z = " + fgThreshold);
+            if (!DebugMod.showingFgObjs)
+                AdjustVisibilityOfAllElements();
+        }
+
+        [BindableMethod(name = "Show Fewer Foreground Elements", category = "Visual")]
+        public static void ShowFewerForegroundElements()
+        {
+            if (fgThreshold < -0.5f)
+                fgThreshold += 0.5f;
+
+            Console.AddLine("Foreground visibility threshold at z = " + fgThreshold);
+            if (!DebugMod.showingFgObjs)
+                AdjustVisibilityOfAllElements();
+        }
+
+        private static void AdjustVisibilityOfAllElements()
+        {
+            var scene = UnityEngine.SceneManagement.SceneManager.GetSceneByName(DebugMod.GetSceneName());
+            GameObject[] rootGameObjects = scene.GetRootGameObjects();
+            if (rootGameObjects != null)
+            {
+                foreach (GameObject gameObject in rootGameObjects)
+                {
+                    AdjustVisibilityOfElementsInTree(gameObject.transform);
+                }
+            }
+        }
+
+        private static void AdjustVisibilityOfElementsInTree(Transform transform)
+        {
+            AdjustVisibility(transform.gameObject);
+
+            foreach (Transform child in transform)
+            {
+                AdjustVisibilityOfElementsInTree(child);
+            }
+        }
+
+        private static void AdjustVisibility(GameObject gameObject)
+        {
+            try
+            {
+                var spriteRenderer = gameObject.GetComponent<SpriteRenderer>();
+                if (spriteRenderer == null)
+                    return;
+
+                var zPos = gameObject.transform.GetPositionZ();
+
+                var color = spriteRenderer.color;
+
+                var goId = gameObject.GetInstanceID();
+                if (!DebugMod.showingFgObjs && zPos < fgThreshold) // If should hide object
+                {
+                    if (!DebugMod.PreviousAlphaValues.ContainsKey(goId)) // If not already hidden
+                    {
+                        DebugMod.PreviousAlphaValues[goId] = color.a;
+                        color.a = 0;
+                    }
+                }
+                else if (DebugMod.PreviousAlphaValues.TryGetValue(gameObject.GetInstanceID(), out var prevValue)) // If should show and was previously hidden
+                {
+                    color.a = prevValue;
+                    DebugMod.PreviousAlphaValues.Remove(goId);
+                }
+
+                spriteRenderer.color = color;
+            }
+            catch (Exception e)
+            {
+                Console.AddLine("Problem while adjusting object visibility:\n" + e);
+            }
+        }
+
         #endregion
 
         #region Panels

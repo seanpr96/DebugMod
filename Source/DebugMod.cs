@@ -1,5 +1,4 @@
 ﻿using System;
-using System.IO;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Linq;
@@ -41,8 +40,10 @@ namespace DebugMod
         internal static bool noclip;
         internal static Vector3 noclipPos;
         internal static bool cameraFollow;
+        internal static bool showingFgObjs = true;
 
         internal static Dictionary<string, Pair> bindMethods = new Dictionary<string, Pair>();
+        internal static readonly Dictionary<int, float> PreviousAlphaValues = new Dictionary<int, float>();
 
         public override void Initialize()
         {
@@ -101,6 +102,10 @@ namespace DebugMod
                 settings.binds.Add("Reset Camera Zoom", (int)KeyCode.End);
                 settings.binds.Add("Toggle HUD", (int)KeyCode.Delete);
                 settings.binds.Add("Hide Hero", (int)KeyCode.Backspace);
+                settings.binds.Add("Take Screenshot", (int)KeyCode.KeypadEnter);
+                settings.binds.Add("Toggle Foreground Elements", (int)KeyCode.Keypad5);
+                settings.binds.Add("Show More Foreground Elements", (int)KeyCode.Keypad2);
+                settings.binds.Add("Show Fewer Foreground Elements", (int)KeyCode.Keypad8);
             }
 
             UnityEngine.SceneManagement.SceneManager.activeSceneChanged += LevelActivated;
@@ -187,6 +192,9 @@ namespace DebugMod
                 PlayerDeathWatcher.Reset();
                 BossHandler.LookForBoss(sceneName);
             }
+
+            showingFgObjs = true;
+            PreviousAlphaValues.Clear();
         }
 
         private string OnLevelUnload(string toScene)
